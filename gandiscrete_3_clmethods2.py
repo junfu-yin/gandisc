@@ -153,8 +153,8 @@ def gan_org(original,splitpoint, targetidxlist, outputfilename='data/test2.csv')
     fullist = list(range(original.shape[1]))
     inputindexes = [item for item in fullist if item not in targetidxlist]
 
-    targetcolumns = original.iloc[0:slpt, targetidxlist]
-    inputcolumns = original.iloc[0:slpt, inputindexes]
+    goutput_content = original.iloc[0:slpt, targetidxlist]
+    ginput_content = original.iloc[0:slpt, inputindexes]
 
     mydata = mydataset(training_set)
 
@@ -169,6 +169,7 @@ def gan_org(original,splitpoint, targetidxlist, outputfilename='data/test2.csv')
 
     goutput = len(targetidxlist)
     ginput = len(inputindexes)
+    image_dim = original.shape[1]
 
     gen_hidden_dim1 = 100
     gen_hidden_dim2 = 200
@@ -177,7 +178,9 @@ def gan_org(original,splitpoint, targetidxlist, outputfilename='data/test2.csv')
     disc_hidden_dim2 = 200
     disc_hidden_dim3 = 100
     # noise_dim = int(original.shape[1] * 0.9)  # Noise data points
-    # noise_dim = original.shape[1]  # Noise data points
+
+
+    noise_dim = original.shape[1]  # Noise data points
 
     # A custom initialization (see Xavier Glorot init)
     def glorot_init(shape):
@@ -208,8 +211,20 @@ def gan_org(original,splitpoint, targetidxlist, outputfilename='data/test2.csv')
     }
 
     # Generator
-    def generator(x):
-        hidden_layer1 = tf.matmul(x, weights['gen_hidden1'])
+    def generator(x, begin, size):
+
+        fullist = list(range(x.shape[1]))
+        inputindexes = [item for item in fullist if item not in targetidxlist]
+
+        # goutput_content = x.iloc[0:slpt, targetidxlist]
+        # ginput_content = x.iloc[0:slpt, inputindexes]
+        temp = x
+        # goutput_content = temp[targetidxlist]
+        # ginput_content = temp[inputindexes]
+        ginput_content = tf.slice(x, begin, size)
+
+
+        hidden_layer1 = tf.matmul(ginput_content, weights['gen_hidden1'])
         hidden_layer1 = tf.add(hidden_layer1, biases['gen_hidden1'])
         hidden_layer1 = tf.nn.relu(hidden_layer1)
 
@@ -224,6 +239,9 @@ def gan_org(original,splitpoint, targetidxlist, outputfilename='data/test2.csv')
         out_layer = tf.matmul(hidden_layer3, weights['gen_out'])
         out_layer = tf.add(out_layer, biases['gen_out'])
         out_layer = tf.nn.sigmoid(out_layer)
+
+        for i in range(len(x)):
+            print(i)
 
         out_layer = gumbel_softmax(out_layer, 0.2, hard=False)
         return out_layer
@@ -250,14 +268,15 @@ def gan_org(original,splitpoint, targetidxlist, outputfilename='data/test2.csv')
 
     # Build Networks
     # Network Inputs
-    gen_input = tf.placeholder(tf.float32, shape=[None, goutput], name='input_noise')
+    gen_input = tf.placeholder(tf.float32, shape=[None, ginput], name='input_noise')
     disc_input = tf.placeholder(tf.float32, shape=[None, image_dim], name='disc_input')
 
     # Build Generator Network
-    gen_sample = generator(gen_input)
+    gen_sample = generator(gen_input, targetidxlist)
 
     # Build 2 Discriminator Networks (one from noise input, one from generated samples)
     disc_real = discriminator(disc_input)
+
     disc_fake = discriminator(gen_sample)
 
     # Build Loss
@@ -368,6 +387,3 @@ if __name__ == "__main__":
     # print(kl_divergence(tf.constant([1.0,2,3]), tf.constant([1.0,2,3])))
     # simplyplot('data/test3_real.csv')
     main()
-
-
-
